@@ -288,10 +288,20 @@ def run_sim(args):
     #clean db
     if "StorageHost".lower() in slurmdbd_conf and args.delete:
         log.info("trancating db from previous runs")
-        conn = pymysql.connect(host=slurmdbd_conf["StorageHost".lower()], 
-                               user=slurmdbd_conf["StorageUser".lower()], 
-                               passwd=slurmdbd_conf["StoragePass".lower()], 
-                               db=slurmdbd_conf['StorageLoc'.lower()])
+        if "MYSQL_UNIX_PORT" not in os.environ:
+        
+            conn = pymysql.connect(host=slurmdbd_conf["StorageHost".lower()], 
+                                   user=slurmdbd_conf["StorageUser".lower()], 
+                                   passwd=slurmdbd_conf["StoragePass".lower()], 
+                                   db=slurmdbd_conf['StorageLoc'.lower()])
+        else:
+            conn = pymysql.connect(host=slurmdbd_conf["StorageHost".lower()], 
+                                   user=slurmdbd_conf["StorageUser".lower()], 
+                                   passwd=slurmdbd_conf["StoragePass".lower()], 
+                                   db=slurmdbd_conf['StorageLoc'.lower()],
+                                   unix_socket=os.environ["MYSQL_UNIX_PORT"])
+
+            
         cur = conn.cursor()
         
         trancate=[
@@ -382,13 +392,17 @@ def run_sim(args):
     #start slurmdbd
     global slurmdbd_proc
     global slurmdbd_out
+    env_dict={'SLURM_CONF':slurm_conf_loc}
+    if "MYSQL_UNIX_PORT" in os.environ:
+        env_dict["MYSQL_UNIX_PORT"]=os.environ["MYSQL_UNIX_PORT"]
+
     
-    if args.odbd=="":
-        slurmdbd_proc=subprocess.Popen([slurmdbd_loc,'-Dvv'],env={'SLURM_CONF':slurm_conf_loc},
+    if args.odbd=="":        
+        slurmdbd_proc=subprocess.Popen([slurmdbd_loc,'-Dvv'],env=env_dict,
                                        stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     else:
         slurmdbd_out=open(args.odbd,"wt")
-        slurmdbd_proc=subprocess.Popen([slurmdbd_loc,'-Dvv'],env={'SLURM_CONF':slurm_conf_loc},
+        slurmdbd_proc=subprocess.Popen([slurmdbd_loc,'-Dvv'],env=env_dict,
                                        stdout=slurmdbd_out,stderr=slurmdbd_out)
     #let the slurmdbd to spin-off
     sleep(3)
